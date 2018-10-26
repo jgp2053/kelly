@@ -112,22 +112,35 @@ multiple_sim <- function(initial_bankroll, odds, probability, possible_bets, num
               max_discrete_bankroll = mean(max_discrete_bankroll))
 }
 
-# data_run = bet_sim(initial_bankroll = 10, odds = .8, probability = .6, possible_bets = c(1, 2, 5, 10, 25, 50), num_bets = 100)
-
-data_run = multiple_sim(initial_bankroll = 100, 
-                        odds = .8, 
-                        probability = .6, 
-                        possible_bets = c(1, 2, 5, 10, 25, 50), 
-                        num_bets = 100, 
-                        num_sims = 100)
+set.seed(11)
+data_run = bet_sim(initial_bankroll = 10, odds = .8, probability = .6, possible_bets = c(1, 2, 5, 10, 25, 50), num_bets = 100)
 
 ggplot(data_run, aes(time)) + 
-  geom_line(aes(y = kelly_bankroll, colour = "Theoretical Kelly")) + 
+  geom_line(aes(y = kelly_bankroll, colour = "Theoretical Kelly"), linetype = "dashed") + 
   geom_line(aes(y = discrete_kelly_bankroll, colour = "Discrete Kelly")) + 
   geom_line(aes(y = modified_discrete_kelly_bankroll, colour = "Modified Discrete Kelly")) + 
   geom_line(aes(y = random_discrete_bankroll, colour = "Random Discrete Bet")) + 
   geom_line(aes(y = max_discrete_bankroll, colour = "Max Discrete Bet")) + 
-  ggtitle("Simulation Study (Averaged Over 1000 Runs)", subtitle = "(Probability = 2/3, Odds = .8, Bets = {1, 2, 5, 10, 25, 50})") + 
-  scale_colour_discrete(name  = "Bet Strategy") + 
+  ggtitle("Simulation Study (Single Run)", subtitle = "(Probability = .6, Odds = .8, Bets = {1, 2, 5, 10, 25, 50})") + 
+  scale_colour_manual(name  ="Bet Strategy", values = my_colors) +
+  ylab("Bankroll") + 
+  xlab("Time")
+
+set.seed(0)
+multiple_runs = multiple_sim(initial_bankroll = 100, 
+                        odds = .8, 
+                        probability = .6, 
+                        possible_bets = c(1, 2, 5, 10, 25, 50), 
+                        num_bets = 100, 
+                        num_sims = 1000)
+
+ggplot(multiple_runs, aes(time)) + 
+  geom_line(aes(y = kelly_bankroll, colour = "Theoretical Kelly"), linetype = "dashed") + 
+  geom_line(aes(y = discrete_kelly_bankroll, colour = "Discrete Kelly")) + 
+  geom_line(aes(y = modified_discrete_kelly_bankroll, colour = "Modified Discrete Kelly")) + 
+  geom_line(aes(y = random_discrete_bankroll, colour = "Random Discrete Bet")) + 
+  geom_line(aes(y = max_discrete_bankroll, colour = "Max Discrete Bet")) + 
+  scale_colour_manual(name  ="Bet Strategy", values = my_colors) +
+  ggtitle("Simulation Study (Averaged Over 1000 Runs)", subtitle = "(Probability = .6, Odds = .8, Bets = {1, 2, 5, 10, 25, 50})") + 
   ylab("Bankroll") + 
   xlab("Time")
