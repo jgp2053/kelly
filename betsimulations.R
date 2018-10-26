@@ -124,7 +124,9 @@ ggplot(data_run, aes(time)) +
   ggtitle("Simulation Study (Single Run)", subtitle = "(Probability = .6, Odds = .8, Bets = {1, 2, 5, 10, 25, 50})") + 
   scale_colour_manual(name  ="Bet Strategy", values = my_colors) +
   ylab("Bankroll") + 
-  xlab("Time")
+  xlab("Time") + 
+  theme_bw() + 
+  theme(legend.position = c(.2, .6))
 
 set.seed(0)
 multiple_runs = multiple_sim(initial_bankroll = 100, 
@@ -143,4 +145,6 @@ ggplot(multiple_runs, aes(time)) +
   scale_colour_manual(name  ="Bet Strategy", values = my_colors) +
   ggtitle("Simulation Study (Averaged Over 1000 Runs)", subtitle = "(Probability = .6, Odds = .8, Bets = {1, 2, 5, 10, 25, 50})") + 
   ylab("Bankroll") + 
-  xlab("Time")
+  xlab("Time") + 
+  theme_bw() + 
+  theme(legend.position = c(.8, .3))
