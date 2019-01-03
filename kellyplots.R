@@ -44,16 +44,31 @@ univ = expand.grid(odds = odds, probability = probability,
     amount_color = as.factor(amount),
     amount = ifelse(amount == "kelly", kelly(odds, probability) * bankroll, as.integer(amount)),
     utility = log_utility(bankroll = bankroll, odds = odds, 
-                          probability = probability, amount = amount))
-univ = mutate(univ, is_kelly = ifelse(amount_color == "kelly", "Kelly", "non-Kelly"))
+                          probability = probability, amount = amount)) %>%
+  mutate(is_kelly = ifelse(amount_color == "kelly", "Kelly", "non-Kelly"))
 
+maxes = univ %>%
+  filter(is_kelly == "non-Kelly") %>%
+  group_by(odds, probability, bankroll) %>%
+  slice(which.max(utility)) %>%
+  select(odds, probability, bankroll, best_bet = amount_color, best_utility = utility)
 
-ggplot(univ, aes(x = probability, y = utility, color = amount_color, linetype = is_kelly)) +
-  geom_line(size = 1) + xlim(.5, .75) + ylim(0, .1) +
-  scale_colour_manual(name  ="Bet Amount", breaks = c("1", "2", "5", "10", "25", "50", "kelly"), values = my_colors) + 
-  scale_linetype_manual(values = c("Kelly" = "dashed", "non-Kelly" = "solid")) + guides(linetype=FALSE) +
-  xlab("Probability") + ylab("Logarithmic Utility") + 
-  ggtitle("Expected Logarithmic Utility with Varying Probability", subtitle = "(Odds = .8, Bankroll = 100)") + theme_bw() + theme(legend.position = c(.2, .6))
+univ %>%
+  left_join(maxes) %>%
+  ggplot(aes(x = probability, y = utility)) +
+  geom_line(aes(color = amount_color, linetype = is_kelly), size = 1) + 
+  geom_ribbon(aes(ymin = 0, ymax = best_utility, fill = best_bet), alpha = .2) +
+  xlim(.55, .75) + 
+  ylim(0, .1) +
+  scale_colour_manual(name  ="Bet Amount", breaks = c("1", "2", "5", "10", "25", "50", "kelly"), values = my_colors) +
+  scale_fill_manual(values = my_colors) +
+  scale_linetype_manual(values = c("Kelly" = "dashed", "non-Kelly" = "solid")) + 
+  guides(linetype = FALSE, fill = FALSE) +
+  xlab("Probability") + 
+  ylab("Logarithmic Utility") + 
+  ggtitle("Expected Logarithmic Utility with Varying Probability", subtitle = "(Odds = .8, Bankroll = 100)") + 
+  theme_bw() + 
+  theme(legend.position = c(.2, .6))
 
 # Varying Odds
 
@@ -68,16 +83,30 @@ univ = expand.grid(odds = odds, probability = probability,
     amount_color = as.factor(amount),
     amount = ifelse(amount == "kelly", kelly(odds, probability) * bankroll, as.integer(amount)),
     utility = log_utility(bankroll = bankroll, odds = odds, 
-                          probability = probability, amount = amount))
-univ = mutate(univ, is_kelly = ifelse(amount_color == "kelly", "Kelly", "non-Kelly"))
+                          probability = probability, amount = amount)) %>%
+  mutate(is_kelly = ifelse(amount_color == "kelly", "Kelly", "non-Kelly"))
 
+maxes = univ %>%
+  filter(is_kelly == "non-Kelly") %>%
+  group_by(odds, probability, bankroll) %>%
+  slice(which.max(utility)) %>%
+  select(odds, probability, bankroll, best_bet = amount_color, best_utility = utility)
 
-ggplot(univ, aes(x = odds, y = utility, color = amount_color, linetype = is_kelly)) +
-  geom_line(size = 1) + xlim(1.5, 2) + ylim(0, .01) +
-  scale_colour_manual(name  ="Bet Amount", breaks = c("500", "1000", "5000", "10000", "kelly"), values = my_colors) + 
-  scale_linetype_manual(values = c("Kelly" = "dashed", "non-Kelly" = "solid")) + guides(linetype=FALSE) +
+univ %>%
+  left_join(maxes) %>%
+  ggplot(aes(x = odds, y = utility)) +
+  geom_line(aes(color = amount_color, linetype = is_kelly), size = 1) + 
+  geom_ribbon(aes(ymin = 0, ymax = best_utility, fill = best_bet), alpha = .2) +
+  xlim(1.5, 2) + 
+  ylim(0, .01) +
+  scale_colour_manual(name  ="Bet Amount", breaks = c("500", "1000", "5000", "10000", "kelly"), values = my_colors) +
+  scale_fill_manual(values = my_colors) +
+  scale_linetype_manual(values = c("Kelly" = "dashed", "non-Kelly" = "solid")) + 
+  guides(linetype = FALSE, fill = FALSE) +
   xlab("Odds") + ylab("Logarithmic Utility") + 
-  ggtitle("Expected Logarithmic Utility with Varying Odds", subtitle = "(Probability = .4, Bankroll = 100000)") + theme_bw() + theme(legend.position = c(.2, .6))
+  ggtitle("Expected Logarithmic Utility with Varying Odds", subtitle = "(Probability = .4, Bankroll = 100000)") + 
+  theme_bw() + 
+  theme(legend.position = c(.2, .6))
 
 # Varying Bankroll
 
@@ -92,13 +121,25 @@ univ = expand.grid(odds = odds, probability = probability,
     amount_color = as.factor(amount),
     amount = ifelse(amount == "kelly", kelly(odds, probability) * bankroll, as.integer(amount)),
     utility = log_utility(bankroll = bankroll, odds = odds, 
-                          probability = probability, amount = amount))
-univ = mutate(univ, is_kelly = ifelse(amount_color == "kelly", "Kelly", "non-Kelly"))
+                          probability = probability, amount = amount)) %>%
+  mutate(is_kelly = ifelse(amount_color == "kelly", "Kelly", "non-Kelly"))
 
+maxes = univ %>%
+  filter(is_kelly == "non-Kelly") %>%
+  group_by(odds, probability, bankroll) %>%
+  slice(which.max(utility)) %>%
+  select(odds, probability, bankroll, best_bet = amount_color, best_utility = utility)
 
-ggplot(univ, aes(x = bankroll, y = utility, color = amount_color, linetype = is_kelly)) +
-  geom_line(size = 1) + ylim(0, .011) + xlim(0, 600) +
-  scale_colour_manual(name  ="Bet Amount", breaks = c("1", "2", "5", "10", "25", "50", "100", "kelly"), values = my_colors) + 
-  scale_linetype_manual(values = c("Kelly" = "dashed", "non-Kelly" = "solid")) + guides(linetype=FALSE) +
+univ %>%
+  left_join(maxes) %>%
+  ggplot(aes(x = bankroll, y = utility)) +
+  geom_line(aes(color = amount_color, linetype = is_kelly), size = 1) + 
+  geom_ribbon(aes(ymin = 0, ymax = best_utility, fill = best_bet), alpha = .2) + 
+  ylim(0, .011) + 
+  xlim(0, 600) +
+  scale_colour_manual(name  ="Bet Amount", breaks = c("1", "2", "5", "10", "25", "50", "100", "kelly"), values = my_colors) +
+  scale_fill_manual(values = my_colors) +
+  scale_linetype_manual(values = c("Kelly" = "dashed", "non-Kelly" = "solid")) + 
+  guides(linetype=FALSE, fill = FALSE) +
   xlab("Bankroll") + ylab("Logarithmic Utility") + 
   ggtitle("Expected Logarithmic Utility with Varying Bankroll", subtitle = "(Probability = .6, Odds = .9)") + theme_bw() + theme(legend.position = c(.875, .5))
