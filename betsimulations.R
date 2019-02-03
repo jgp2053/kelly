@@ -43,8 +43,12 @@ random_bet <- function(bankroll, bet){
 # Betting strategy: pick the highest bet from the discrete options that can be afforded
 max_bet <- function(bankroll, bet){
   bet_possible = bet[bet <= bankroll]
-  ifelse(bankroll >= finalbet, finalbet, 0)
-  
+  if(length(bet_possible) > 0){
+    max(bet_possible, 1)
+  }
+  else{
+    0
+  }
 }
 
 # Betting strategy: bet the kelly bet, regardless of the discrete options
@@ -161,7 +165,7 @@ ggplot(data_run, aes(x = time)) +
   theme_bw() + 
   theme(legend.position = c(.2, .6))
 
-set.seed(1000)
+set.seed(1)
 multiple_runs = multiple_sim(initial_bankroll = 100, 
                         odds = .8, 
                         probability = .6, 
@@ -181,5 +185,4 @@ ggplot(multiple_runs, aes(time)) +
   ylab("Bankroll") + 
   xlab("Time") + 
   ylim(0, 200) +
-  theme_bw() + 
-  theme(legend.position = c(.8, .3))
+  theme_bw()
