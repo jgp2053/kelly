@@ -2,10 +2,9 @@ library(tidyverse)
 library(RColorBrewer)
 
 log_utility <- function(bankroll, amount, probability, odds) {
-  return_this <- ifelse(amount >= bankroll, NA, 
-                        probability * log(1 + odds * amount / bankroll) + 
-                          (1 - probability) * log(1 - amount / bankroll))
-  return_this
+  ifelse(amount >= bankroll, NA, 
+         probability * log(1 + odds * amount / bankroll) + 
+           (1 - probability) * log(1 - amount / bankroll))
 }
 
 kelly <- function(odds, probability) {
@@ -25,11 +24,7 @@ intersection <- function(f1, f2, x_lower, x_higher, accuracy = .001, epsilon = .
   }
 }
 
-EV <- function(odds, probability, bet, bankroll){
-  probability * log(1 + (odds * bet / bankroll)) + (1 - probability) * log(1 - (bet / bankroll))
-}
-
-my_colors <- c("#000000", "#56B4E9", "#E69F00", "#F0E442", "#009E73", "#0072B2", "#D55E00", "#CC7947")
+my_colors <- RColorBrewer::brewer.pal(8, 'Set1')
 
 # Varying Probability
 
@@ -57,7 +52,8 @@ univ %>%
   left_join(maxes) %>%
   ggplot(aes(x = probability, y = utility)) +
   geom_line(aes(color = amount_color, linetype = is_kelly), size = 1) + 
-  geom_ribbon(aes(ymin = 0, ymax = best_utility, fill = best_bet), alpha = .2) +
+  # geom_ribbon(aes(ymin = 0, ymax = best_utility, fill = best_bet), alpha = .2) +
+  geom_ribbon(aes(ymin = 0, ymax = .1, fill = best_bet), alpha = .1) +
   xlim(.55, .75) + 
   ylim(0, .1) +
   scale_colour_manual(name  ="Bet Amount", breaks = c("1", "2", "5", "10", "25", "50", "kelly"), values = my_colors) +
@@ -67,8 +63,7 @@ univ %>%
   xlab("Probability") + 
   ylab("Logarithmic Utility") + 
   ggtitle("Expected Logarithmic Utility with Varying Probability", subtitle = "(Odds = .8, Bankroll = 100)") + 
-  theme_bw() + 
-  theme(legend.position = c(.2, .6))
+  theme_bw() 
 
 # Varying Odds
 
@@ -96,7 +91,8 @@ univ %>%
   left_join(maxes) %>%
   ggplot(aes(x = odds, y = utility)) +
   geom_line(aes(color = amount_color, linetype = is_kelly), size = 1) + 
-  geom_ribbon(aes(ymin = 0, ymax = best_utility, fill = best_bet), alpha = .2) +
+  # geom_ribbon(aes(ymin = 0, ymax = best_utility, fill = best_bet), alpha = .2) +
+  geom_ribbon(aes(ymin = 0, ymax = .01, fill = best_bet), alpha = .1) +
   xlim(1.5, 2) + 
   ylim(0, .01) +
   scale_colour_manual(name  ="Bet Amount", breaks = c("500", "1000", "5000", "10000", "kelly"), values = my_colors) +
@@ -105,8 +101,7 @@ univ %>%
   guides(linetype = FALSE, fill = FALSE) +
   xlab("Odds") + ylab("Logarithmic Utility") + 
   ggtitle("Expected Logarithmic Utility with Varying Odds", subtitle = "(Probability = .4, Bankroll = 100000)") + 
-  theme_bw() + 
-  theme(legend.position = c(.2, .6))
+  theme_bw()
 
 # Varying Bankroll
 
@@ -134,7 +129,8 @@ univ %>%
   left_join(maxes) %>%
   ggplot(aes(x = bankroll, y = utility)) +
   geom_line(aes(color = amount_color, linetype = is_kelly), size = 1) + 
-  geom_ribbon(aes(ymin = 0, ymax = best_utility, fill = best_bet), alpha = .2) + 
+  # geom_ribbon(aes(ymin = 0, ymax = best_utility, fill = best_bet), alpha = .2) +
+  geom_ribbon(aes(ymin = 0, ymax = .011, fill = best_bet), alpha = .1) +  
   ylim(0, .011) + 
   xlim(0, 600) +
   scale_colour_manual(name  ="Bet Amount", breaks = c("1", "2", "5", "10", "25", "50", "100", "kelly"), values = my_colors) +
@@ -142,4 +138,5 @@ univ %>%
   scale_linetype_manual(values = c("Kelly" = "dashed", "non-Kelly" = "solid")) + 
   guides(linetype=FALSE, fill = FALSE) +
   xlab("Bankroll") + ylab("Logarithmic Utility") + 
-  ggtitle("Expected Logarithmic Utility with Varying Bankroll", subtitle = "(Probability = .6, Odds = .9)") + theme_bw() + theme(legend.position = c(.875, .5))
+  ggtitle("Expected Logarithmic Utility with Varying Bankroll", subtitle = "(Probability = .6, Odds = .9)") + 
+  theme_bw()
