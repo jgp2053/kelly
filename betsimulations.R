@@ -224,26 +224,15 @@ multiple_sim <- function(initial_bankroll, odds, probability, possible_bets, num
   return(result)
 }
 
-profvis({
-  
-  multiple_run = multiple_sim(
-    initial_bankroll = 100, 
-    odds = 1, 
-    probability = .55, 
-    possible_bets = c(2^seq(1, 10^4), 3^seq(1, 10^4)), 
-    num_bets = 10^4,
-    num_sims = 5
-  )
-  
-})
+set.seed(0)
 
 multiple_run = multiple_sim(
   initial_bankroll = 100, 
   odds = 1, 
   probability = .55, 
-  possible_bets = c(2^seq(1, 10^4), 3^seq(1, 10^4)), 
+  possible_bets = c(2^seq(1, 10^4)), 
   num_bets = 10^4,
-  num_sims = 100
+  num_sims = 10^3
 )
 
 
@@ -301,6 +290,21 @@ percent_win <- multiple_run %>%
     )
   )
 
+ending_distribution <- multiple_run %>%
+  filter(time == max(time)) %>%
+  select(sim_no, time, discrete_kelly_bankroll, closest_bookend_bankroll, modified_discrete_kelly_bankroll) %>%
+  gather(key = 'strategy', value = 'bankroll', -one_of(c('sim_no', 'time'))) %>%
+  # clean up column value for graph
+  mutate(
+    strategy = ifelse(
+      strategy == 'discrete_kelly_bankroll', 'Discrete Kelly',
+      ifelse(
+        strategy == 'closest_bookend_bankroll', 'Closest Bookend',
+        'Random Bookend'
+      )
+    )
+  )
+
 ggplot(
   data = means,
   mapping = aes(x = time, y = bankroll, color = strategy)
@@ -308,7 +312,7 @@ ggplot(
   geom_line() +
   scale_colour_manual(name  ="Bet Strategy", values = my_colors) +
   ggtitle(
-    "Mean bankroll over time (100 runs)", 
+    "Mean bankroll over time (1000 runs)", 
     "(Probability = .55, Odds = 1, Bets = powers of 2)"
   ) +
   ylab("Mean bankroll") +
@@ -326,7 +330,7 @@ ggplot(
   geom_line() +
   scale_colour_manual(name  ="Bet Strategy", values = my_colors) +
   ggtitle(
-    "Median bankroll over time (100 runs)", 
+    "Median bankroll over time (1000 runs)", 
     "(Probability = .55, Odds = 1, Bets = powers of 2)"
   ) +
   ylab("Median bankroll") +
@@ -344,7 +348,7 @@ ggplot(
   geom_line() +
   scale_colour_manual(name  ="Bet Strategy", values = my_colors) +
   ggtitle(
-     "Which strategy 'wins' at each point in time? (100 Runs)", 
+     "Which strategy 'wins' at each point in time? (1000 runs)", 
      "(Probability = .55, Odds = 1, Bets = powers of 2)"
      ) +
   ylab("# of Runs w/ Maximal Bankroll") +
@@ -353,3 +357,17 @@ ggplot(
   theme(legend.position = "none") +
   geom_dl(aes(label = strategy), method = list(dl.trans(x = x + .3), "last.bumpup")) +
   scale_x_continuous(expand = expand_scale(mult = c(0.05, .5)))
+
+ggplot(
+  data = ending_distribution,
+  mapping = aes(x = bankroll, color = strategy)
+) +
+  geom_density(size = 1) +
+  scale_colour_manual(name  ="Bet Strategy", values = my_colors) +
+  ggtitle(
+    "Ending bankroll distribution (1000 runs)", 
+    "(Probability = .55, Odds = 1, Bets = powers of 2)"
+  ) +
+  xlab("Bankroll") +
+  theme_bw() +
+  scale_x_continuous(trans='log10')
