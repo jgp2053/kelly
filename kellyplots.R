@@ -159,6 +159,9 @@ maxes = univ %>%
   slice(which.max(utility)) %>%
   select(odds, probability, bankroll, best_bet = amount_color, best_utility = utility)
 
+x_offset = 5
+y_offset = -.0005
+
 univ %>%
   left_join(maxes) %>%
   ggplot(aes(x = bankroll, y = utility)) +
@@ -174,4 +177,10 @@ univ %>%
   guides(linetype=FALSE, fill = FALSE) +
   xlab("Bankroll") + ylab("Logarithmic Utility") + 
   ggtitle("Expected Logarithmic Utility with Varying Bankroll", subtitle = "(Probability = .6, Odds = .9)") + 
-  theme_bw()
+  theme_bw() + 
+  geom_point(aes(x=241.618691, y=0.009733776)) +
+  geom_text(aes(x=241.618691 + x_offset, y=0.009733776 + y_offset, label = 'B')) +
+  geom_point(aes(x=483.237382, y=0.009733776)) +
+  geom_text(aes(x=483.237382 + x_offset, y=0.009733776 + y_offset, label = 'C')) +
+  geom_point(aes(x=400, y=0.01055328)) +
+  geom_text(aes(x=400 + x_offset, y=0.01055328 + y_offset, label = 'A'))
