@@ -1,6 +1,6 @@
 library(tidyverse)
-library(profvis)
 library(directlabels)
+library(purrr)
 
 # Define colors for lines in graphs to follow
 my_colors <- RColorBrewer::brewer.pal(6, "Dark2")
@@ -119,19 +119,22 @@ bet_sim <- function(initial_bankroll, odds, probability, possible_bets, num_bets
   # Initialize bankroll vectors
   kelly_bankroll = integer(length(num_bets))
   discrete_kelly_bankroll = integer(length(num_bets))
-  modified_discrete_kelly_bankroll = integer(length(num_bets))
+  random_bookend_bankroll = integer(length(num_bets))
   closest_bookend_bankroll = integer(length(num_bets))
   # random_discrete_bankroll = integer(length(num_bets))
   # max_discrete_bankroll = integer(length(num_bets))
-
   
   # Set the initial bankrolls
   kelly_bankroll[1] = initial_bankroll
   discrete_kelly_bankroll[1] = initial_bankroll
   closest_bookend_bankroll[1] = initial_bankroll
-  modified_discrete_kelly_bankroll[1] = initial_bankroll
+  random_bookend_bankroll[1] = initial_bankroll
   # random_discrete_bankroll[1] = initial_bankroll
   # max_discrete_bankroll[1] = initial_bankroll
+
+  # check if the discrete kelly and closest bookend strategies differ
+  diff_bet = integer(length(num_bets))
+  diff_bet[1] = NA
   
   # Bet num_bets times
   for (i in 2:(num_bets + 1)){
@@ -145,21 +148,32 @@ bet_sim <- function(initial_bankroll, odds, probability, possible_bets, num_bets
         result_multiplier *
         kelly_bet(odds, probability, kelly_bankroll[i-1], possible_bets)
       )
+    
     discrete_kelly_bankroll[i] <- 
       discrete_kelly_bankroll[i-1] + (
         result_multiplier *
         best_fixed_bet(odds, probability, discrete_kelly_bankroll[i-1], possible_bets)
       )
+    
     closest_bookend_bankroll[i] <- 
       closest_bookend_bankroll[i-1] + (
         result_multiplier *
         closest_bookend_bet(odds, probability, closest_bookend_bankroll[i-1], possible_bets)
       )
-    modified_discrete_kelly_bankroll[i] <- 
-      modified_discrete_kelly_bankroll[i-1] + (
-        result_multiplier *
-        best_two_bets(odds, probability, modified_discrete_kelly_bankroll[i-1], possible_bets)
+    
+    diff_bet[i] <- 
+      near(
+        best_fixed_bet(odds, probability, discrete_kelly_bankroll[i-1], possible_bets),
+        closest_bookend_bet(odds, probability, discrete_kelly_bankroll[i-1], possible_bets)
       )
+    
+    random_bookend_bankroll[i] <- 
+      random_bookend_bankroll[i-1] + (
+        result_multiplier *
+        best_two_bets(odds, probability, random_bookend_bankroll[i-1], possible_bets)
+      )
+    
+    
     # random_discrete_bankroll[i] <- 
     #   random_discrete_bankroll[i-1] + (
     #     result_multiplier *
@@ -178,86 +192,47 @@ bet_sim <- function(initial_bankroll, odds, probability, possible_bets, num_bets
       kelly_bankroll, 
       discrete_kelly_bankroll, 
       closest_bookend_bankroll,
-      modified_discrete_kelly_bankroll
+      random_bookend_bankroll,
       # random_discrete_bankroll, 
-      # max_discrete_bankroll
+      # max_discrete_bankroll,
+      diff_bet
     )
   )
 }
 
-set.seed(0)
-
-data_run = bet_sim(
-  initial_bankroll = 1000, 
-  odds = 1, 
-  probability = .55, 
-  possible_bets = c(2^seq(1, 10^4), 3^seq(1, 10^4)), 
-  num_bets = 10^4
-)
-
-ggplot(data_run, aes(x = time)) + 
-  geom_line(aes(y = kelly_bankroll, colour = "Theoretical Kelly"), linetype = "dashed") + 
-  geom_line(aes(y = discrete_kelly_bankroll, colour = "Discrete Kelly")) + 
-  geom_line(aes(y = modified_discrete_kelly_bankroll, colour = "Random Bookend Bet: Modified Discrete Kelly")) + 
-  # geom_line(aes(y = random_discrete_bankroll, colour = "Random Discrete Bet")) + 
-  # geom_line(aes(y = max_discrete_bankroll, colour = "Max Discrete Bet")) + 
-  geom_line(aes(y = closest_bookend_bankroll, colour = "Closest Bookend Bet: Modified Discrete Kelly")) + 
-  ggtitle("Simulation Study (Single Run)", subtitle = "(Probability = .6, Odds = .8, Bets = {1, 2, 5, 10, 25, 50})") + 
-  scale_colour_manual(name  ="Bet Strategy", values = my_colors) +
-  ylab("Bankroll") + 
-  xlab("Time") + 
-  theme_bw() + 
-  theme(legend.position = c(.2, .6))
-
-
-
-
 # Simulate a series of runs and take the average bankroll at each step
 multiple_sim <- function(initial_bankroll, odds, probability, possible_bets, num_bets, num_sims){
-  result = data.frame()
-  for(sim in 1:num_sims){
-    print(sim)
-    simdf = bet_sim(initial_bankroll, odds, probability, possible_bets, num_bets) %>%
-      add_column(sim_no = sim)
-    result = rbind(result, simdf)
-  }
-  return(result)
+  replicate(
+    n = num_sims, 
+    expr = bet_sim(initial_bankroll, odds, probability, possible_bets, num_bets),
+    simplify = FALSE
+  ) %>%
+    # bind the simulations together
+    # (we use the identity function since nothing needs to be done to the dfs)
+    map_dfr(identity, .id = "sim_no")
 }
 
 set.seed(0)
 
-multiple_run = multiple_sim(
+multiple_run <- multiple_sim(
   initial_bankroll = 100, 
   odds = 1, 
-  probability = .55, 
-  possible_bets = c(2^seq(1, 10^4)), 
+  probability = .525, 
+  possible_bets = 2^seq(1, 1023),
   num_bets = 10^4,
-  num_sims = 10^3
+  num_sims = 2.5 * 10^3
 )
 
+save.image(file = "2500_runs.Rdata")
+
+# median bankroll at each point in time
 
 medians <- multiple_run %>%
   group_by(time) %>%
   summarise(discrete_kelly_bankroll = median(discrete_kelly_bankroll),
-            modified_discrete_kelly_bankroll = median(modified_discrete_kelly_bankroll),
-            closest_bookend_bankroll = median(closest_bookend_bankroll)) %>%
-  gather(key = 'strategy', value = 'bankroll', -time) %>%
-    # clean up column value for graph
-    mutate(
-      strategy = ifelse(
-        strategy == 'discrete_kelly_bankroll', 'Discrete Kelly',
-        ifelse(
-          strategy == 'closest_bookend_bankroll', 'Closest Bookend',
-          'Random Bookend'
-        )
-      )
-    )
-
-means <- multiple_run %>%
-  group_by(time) %>%
-  summarise(discrete_kelly_bankroll = mean(discrete_kelly_bankroll),
-            modified_discrete_kelly_bankroll = mean(modified_discrete_kelly_bankroll),
-            closest_bookend_bankroll = mean(closest_bookend_bankroll)) %>%
+            random_bookend_bankroll = median(random_bookend_bankroll),
+            closest_bookend_bankroll = median(closest_bookend_bankroll),
+            kelly_bankroll = median(kelly_bankroll)) %>%
   gather(key = 'strategy', value = 'bankroll', -time) %>%
   # clean up column value for graph
   mutate(
@@ -265,15 +240,78 @@ means <- multiple_run %>%
       strategy == 'discrete_kelly_bankroll', 'Discrete Kelly',
       ifelse(
         strategy == 'closest_bookend_bankroll', 'Closest Bookend',
-        'Random Bookend'
+        ifelse(
+          strategy == 'random_bookend_bankroll', 'Random Bookend',
+          'Kelly'
+        )
+      )
+    )
+  )
+
+ggplot(
+  data = medians,
+  mapping = aes(x = time, y = bankroll, color = strategy)
+) +
+  geom_line() +
+  scale_colour_manual(name  ="Bet Strategy", values = my_colors) +
+  ggtitle(
+    "Median bankroll over time (2500 runs)", 
+    "(Probability = .525, Odds = 1, Bets = powers of 2, Initial Bankroll = 100)"
+  ) +
+  ylab("Median bankroll") +
+  xlab("Time") +
+  theme_bw() +
+  theme(legend.position = "none") +
+  geom_dl(aes(label = strategy), method = list(dl.trans(x = x + .3), "last.bumpup")) +
+  scale_x_continuous(expand = expand_scale(mult = c(0.05, .5))) +
+  scale_y_continuous(trans='log10')
+
+# mean bankroll at each point in time
+
+means <- multiple_run %>%
+  group_by(time) %>%
+  summarise(discrete_kelly_bankroll = mean(discrete_kelly_bankroll),
+            random_bookend_bankroll = mean(random_bookend_bankroll),
+            closest_bookend_bankroll = mean(closest_bookend_bankroll),
+            kelly_bankroll = mean(kelly_bankroll)) %>%
+  gather(key = 'strategy', value = 'bankroll', -time) %>%
+  # clean up column value for graph
+  mutate(
+    strategy = ifelse(
+      strategy == 'discrete_kelly_bankroll', 'Discrete Kelly',
+      ifelse(
+        strategy == 'closest_bookend_bankroll', 'Closest Bookend',
+        ifelse(
+          strategy == 'random_bookend_bankroll', 'Random Bookend',
+          'Kelly'
+        )
       )
     )
   )
   
+ggplot(
+  data = means,
+  mapping = aes(x = time, y = bankroll, color = strategy)
+) +
+  geom_line() +
+  scale_colour_manual(name  ="Bet Strategy", values = my_colors) +
+  ggtitle(
+    "Mean bankroll (2500 runs)", 
+    "(Probability = .525, Odds = 1, Bets = powers of 2, Initial Bankroll = 100)"
+  ) +
+  ylab("Mean bankroll") +
+  xlab("Time") +
+  theme_bw() +
+  theme(legend.position = "none") +
+  geom_dl(aes(label = strategy), method = list(dl.trans(x = x + .3), "last.bumpup")) +
+  scale_x_continuous(expand = expand_scale(mult = c(0.05, .5))) +
+  scale_y_continuous(trans='log10')
+
+# at this point we narrow down to discrete kelly and closest bookend
+# and see how many times each is ahead
 
 percent_win <- multiple_run %>%
-  # filter(time == max(time)) %>%
-  select(sim_no, time, discrete_kelly_bankroll, closest_bookend_bankroll, modified_discrete_kelly_bankroll) %>%
+  select(sim_no, time, discrete_kelly_bankroll, closest_bookend_bankroll) %>%
   gather(key = 'strategy', value = 'bankroll', -one_of(c('sim_no', 'time'))) %>%
   group_by(sim_no, time) %>%
   filter(bankroll == max(bankroll)) %>%
@@ -285,14 +323,36 @@ percent_win <- multiple_run %>%
       strategy == 'discrete_kelly_bankroll', 'Discrete Kelly',
       ifelse(
         strategy == 'closest_bookend_bankroll', 'Closest Bookend',
-        'Random Bookend'
+        ifelse(
+          strategy == 'random_bookend_bankroll', 'Random Bookend',
+          'Kelly'
+        )
       )
     )
   )
 
+ggplot(
+  data = percent_win,
+  mapping = aes(x = time, y = best_count, color = strategy)
+) +
+  geom_line() +
+  scale_colour_manual(name  ="Bet Strategy", values = my_colors) +
+  ggtitle(
+    "Which strategy 'wins' at each point in time? (2500 runs)", 
+    "(Probability = .525, Odds = 1, Bets = powers of 2, Initial Bankroll = 100)"
+  ) +
+  ylab("# of Runs w/ Maximal Bankroll") +
+  xlab("Time") +
+  theme_bw() +
+  theme(legend.position = "none") +
+  geom_dl(aes(label = strategy), method = list(dl.trans(x = x + .3), "last.bumpup")) +
+  scale_x_continuous(expand = expand_scale(mult = c(0.05, .5)))
+
+# now we look at the final distribution -- as total $, and as a % of discrete kelly
+
 ending_distribution <- multiple_run %>%
   filter(time == max(time)) %>%
-  select(sim_no, time, discrete_kelly_bankroll, closest_bookend_bankroll, modified_discrete_kelly_bankroll) %>%
+  select(sim_no, time, discrete_kelly_bankroll, closest_bookend_bankroll, random_bookend_bankroll, kelly_bankroll) %>%
   gather(key = 'strategy', value = 'bankroll', -one_of(c('sim_no', 'time'))) %>%
   # clean up column value for graph
   mutate(
@@ -300,63 +360,13 @@ ending_distribution <- multiple_run %>%
       strategy == 'discrete_kelly_bankroll', 'Discrete Kelly',
       ifelse(
         strategy == 'closest_bookend_bankroll', 'Closest Bookend',
-        'Random Bookend'
+        ifelse(
+          strategy == 'random_bookend_bankroll', 'Random Bookend',
+          'Kelly'
+        )
       )
     )
   )
-
-ggplot(
-  data = means,
-  mapping = aes(x = time, y = bankroll, color = strategy)
-  ) +
-  geom_line() +
-  scale_colour_manual(name  ="Bet Strategy", values = my_colors) +
-  ggtitle(
-    "Mean bankroll over time (1000 runs)", 
-    "(Probability = .55, Odds = 1, Bets = powers of 2)"
-  ) +
-  ylab("Mean bankroll") +
-  xlab("Time") +
-  theme_bw() +
-  theme(legend.position = "none") +
-  geom_dl(aes(label = strategy), method = list(dl.trans(x = x + .3), "last.bumpup")) +
-  scale_x_continuous(expand = expand_scale(mult = c(0.05, .5))) +
-  scale_y_continuous(trans='log10')
-
-ggplot(
-  data = medians,
-  mapping = aes(x = time, y = bankroll, color = strategy)
-) +
-  geom_line() +
-  scale_colour_manual(name  ="Bet Strategy", values = my_colors) +
-  ggtitle(
-    "Median bankroll over time (1000 runs)", 
-    "(Probability = .55, Odds = 1, Bets = powers of 2)"
-  ) +
-  ylab("Median bankroll") +
-  xlab("Time") +
-  theme_bw() +
-  theme(legend.position = "none") +
-  geom_dl(aes(label = strategy), method = list(dl.trans(x = x + .3), "last.bumpup")) +
-  scale_x_continuous(expand = expand_scale(mult = c(0.05, .5))) +
-  scale_y_continuous(trans='log10')
-
-ggplot(
-  data = percent_win,
-  mapping = aes(x = time, y = best_count, color = strategy)
-  ) +
-  geom_line() +
-  scale_colour_manual(name  ="Bet Strategy", values = my_colors) +
-  ggtitle(
-     "Which strategy 'wins' at each point in time? (1000 runs)", 
-     "(Probability = .55, Odds = 1, Bets = powers of 2)"
-     ) +
-  ylab("# of Runs w/ Maximal Bankroll") +
-  xlab("Time") +
-  theme_bw() +
-  theme(legend.position = "none") +
-  geom_dl(aes(label = strategy), method = list(dl.trans(x = x + .3), "last.bumpup")) +
-  scale_x_continuous(expand = expand_scale(mult = c(0.05, .5)))
 
 ggplot(
   data = ending_distribution,
@@ -365,9 +375,65 @@ ggplot(
   geom_density(size = 1) +
   scale_colour_manual(name  ="Bet Strategy", values = my_colors) +
   ggtitle(
-    "Ending bankroll distribution (1000 runs)", 
-    "(Probability = .55, Odds = 1, Bets = powers of 2)"
+    "Ending bankroll distribution (2500 runs)", 
+    "(Probability = .525, Odds = 1, Bets = powers of 2, Initial Bankroll = 100)"
   ) +
   xlab("Bankroll") +
   theme_bw() +
   scale_x_continuous(trans='log10')
+
+# (0/0) -> NaN # if both bankrolls are zero, output is NaN
+# (x/0) -> Inf
+# (0/x) -> 0
+
+ending_distribution_as_percent <- multiple_run %>%
+  filter(time == max(time)) %>%
+  mutate(
+    closest_bookend_frac = closest_bookend_bankroll / discrete_kelly_bankroll,
+    random_bookend_frac = random_bookend_bankroll / discrete_kelly_bankroll,
+    kelly_frac = kelly_bankroll / discrete_kelly_bankroll
+  ) %>%
+  select(sim_no, time, closest_bookend_frac, random_bookend_frac, kelly_frac) %>%
+  gather(key = 'strategy', value = 'bankroll', -one_of(c('sim_no', 'time'))) %>%
+  # clean up column value for graph
+  mutate(
+    strategy = ifelse(
+      strategy == 'kelly_frac', 'Kelly',
+      ifelse(
+        strategy == 'closest_bookend_frac', 'Closest Bookend',
+        ifelse(
+          strategy == 'random_bookend_frac', 'Random Bookend',
+          'Kelly'
+        )
+      )
+    )
+  )
+
+
+ending_distribution_as_percent %>%
+  filter(strategy == 'Closest Bookend') %>%
+  ggplot(
+    mapping = aes(x = bankroll)
+  ) +
+  geom_density(size = 1) +
+  scale_colour_manual(name  ="Bet Strategy", values = my_colors) +
+  ggtitle(
+    "Bankroll distribution - closest bookend vs. discrete kelly (2500 runs)", 
+    "(Probability = .525, Odds = 1, Bets = powers of 2, Initial Bankroll = 100)"
+  ) +
+  xlab("Closest Bookend Bankroll / Discrete Kelly Bankroll") +
+  theme_bw()
+
+ending_distribution_as_percent %>%
+  filter(strategy == 'Random Bookend') %>%
+  ggplot(
+    mapping = aes(x = bankroll)
+  ) +
+  geom_density(size = 1) +
+  scale_colour_manual(name  ="Bet Strategy", values = my_colors) +
+  ggtitle(
+    "Bankroll distribution - random bookend vs. discrete kelly (2500 runs)", 
+    "(Probability = .525, Odds = 1, Bets = powers of 2, Initial Bankroll = 100)"
+  ) +
+  xlab("Random Bookend Bankroll / Discrete Kelly Bankroll") +
+  theme_bw()
