@@ -1,9 +1,6 @@
 library(tidyverse)
 library(directlabels)
 
-# Define colors for lines in graphs to follow
-my_colors <- RColorBrewer::brewer.pal(6, "Dark2")
-
 # Expected Logarithmic Growth
 EV <- function(odds, probability, bankroll, bet){
   # TODO: fix logic for floating point errors
@@ -232,11 +229,30 @@ clean_strategy_name <- function(name){
     grepl('random_discrete', name) ~ 'Random',
     grepl('max_discrete', name) ~ 'Maximum',
     grepl('kelly', name) ~ 'Kelly'
+  ) %>%
+    as_factor()
+}
+
+# Define colors for lines in graphs to follow
+# Colors are persistent across graphs
+my_colors <- RColorBrewer::brewer.pal(6, "Dark2")
+names(my_colors) <- colnames(multiple_run) %>%
+  as_tibble() %>%
+  filter(grepl('bankroll', value)) %>%
+  mutate(value = clean_strategy_name(value)) %>%
+  .$value
+
+# Define common style for graphs
+kelly_plot_style <- function(){
+  list(
+    theme_bw(),
+    scale_colour_manual(name = "Bet Strategy", values = my_colors, guide = "none"),
+    geom_dl(method = list('last.bumpup', dl.trans(x = x + .2), cex = .85, hjust = 0)),
+    scale_x_continuous(expand = expansion(mult = c(0, .3)))
   )
 }
 
 # median bankroll at each point in time
-
 medians <- multiple_run %>%
   group_by(time) %>%
   summarise(discrete_kelly_bankroll = median(discrete_kelly_bankroll),
@@ -249,21 +265,17 @@ medians <- multiple_run %>%
 
 graph_medians <- ggplot(
   data = medians,
-  mapping = aes(x = time, y = bankroll, color = strategy)
+  mapping = aes(x = time, y = bankroll, color = strategy, label = strategy)
 ) +
+  kelly_plot_style() +
   geom_line() +
-  scale_colour_manual(name  ="Bet Strategy", values = my_colors) +
   ggtitle(
     "Median bankroll over time (1000 runs)", 
     "(Probability = .525, Odds = 1, Bets = powers of 2, Initial Bankroll = 100)"
   ) +
   ylab("Median bankroll") +
   xlab("Time") +
-  theme_bw() +
-  theme(legend.position = "none") +
-  geom_dl(aes(label = strategy), method = list(dl.trans(x = x + .3), "last.bumpup")) +
-  scale_x_continuous(expand = expansion(mult = c(0.05, .5))) +
-  scale_y_continuous(trans='log10')
+  scale_y_continuous(trans='log10', expand = expansion(mult = c(0, .1)))
 
 ggsave(
   file = 'medians.png', 
@@ -274,7 +286,6 @@ ggsave(
 )
 
 # mean bankroll at each point in time
-
 means <- multiple_run %>%
   group_by(time) %>%
   summarise(discrete_kelly_bankroll = mean(discrete_kelly_bankroll),
@@ -287,21 +298,17 @@ means <- multiple_run %>%
   
 graph_means <- ggplot(
   data = means,
-  mapping = aes(x = time, y = bankroll, color = strategy)
+  mapping = aes(x = time, y = bankroll, color = strategy, label = strategy)
 ) +
+  kelly_plot_style() +
   geom_line() +
-  scale_colour_manual(name  ="Bet Strategy", values = my_colors) +
   ggtitle(
     "Mean bankroll over time (1000 runs)", 
     "(Probability = .525, Odds = 1, Bets = powers of 2, Initial Bankroll = 100)"
   ) +
   ylab("Mean bankroll") +
   xlab("Time") +
-  theme_bw() +
-  theme(legend.position = "none") +
-  geom_dl(aes(label = strategy), method = list(dl.trans(x = x + .3), "last.bumpup")) +
-  scale_x_continuous(expand = expansion(mult = c(0.05, .5))) +
-  scale_y_continuous(trans='log10')
+  scale_y_continuous(trans='log10', expand = expansion(mult = c(0, .1)))
 
 ggsave(
   file = 'means.png', 
@@ -312,7 +319,6 @@ ggsave(
 )
 
 # see how often strategies are tied with or ahead of kelly
-
 percent_win <- multiple_run %>%
   select(-c(diff_bet, bet_result)) %>%
   pivot_longer(
@@ -333,19 +339,23 @@ percent_win <- multiple_run %>%
   # clean up column value for graph
   mutate(strategy = clean_strategy_name(strategy))
 
-graph_beat_or_tie <- ggplot(percent_win, aes(x = time, y = beats_or_ties_discrete_kelly_count, color = strategy)) +
+graph_beat_or_tie <- ggplot(
+  data = percent_win, 
+  aes(
+    x = time, 
+    y = beats_or_ties_discrete_kelly_count, 
+    color = strategy,
+    label = strategy
+  )
+) +
+  kelly_plot_style() +
   geom_line() +
-  scale_colour_manual(name ="Bet Strategy", values = my_colors) +
   ggtitle(
     "Discrete Kelly vs. alternative strategies (1000 runs)", 
     "(Probability = .525, Odds = 1, Bets = powers of 2, Initial Bankroll = 100)"
   ) +
   ylab("# of Runs Beating or Tying Discrete Kelly") +
-  xlab("Time") +
-  theme_bw() +
-  theme(legend.position = "none") +
-  geom_dl(aes(label = strategy), method = list(dl.trans(x = x + .3), "last.bumpup")) +
-  scale_x_continuous(expand = expansion(mult = c(0.05, .5)))
+  xlab("Time")
 
 ggsave(
   file = 'beat_or_tie.png', 
@@ -355,19 +365,23 @@ ggsave(
   path = 'simulation_plots'
 )
 
-graph_beats <- ggplot(percent_win, aes(x = time, y = beats_discrete_kelly_count, color = strategy)) +
+graph_beats <- ggplot(
+  data = percent_win, 
+  aes(
+    x = time, 
+    y = beats_discrete_kelly_count, 
+    color = strategy,
+    label = strategy
+  )
+) +  
   geom_line() +
-  scale_colour_manual(name ="Bet Strategy", values = my_colors) +
   ggtitle(
     "Discrete Kelly vs. alternative strategies (1000 runs)", 
     "(Probability = .525, Odds = 1, Bets = powers of 2, Initial Bankroll = 100)"
   ) +
   ylab("# of Runs Beating Discrete Kelly") +
   xlab("Time") +
-  theme_bw() +
-  theme(legend.position = "none") +
-  geom_dl(aes(label = strategy), method = list(dl.trans(x = x + .3), "last.bumpup")) +
-  scale_x_continuous(expand = expansion(mult = c(0.05, .5)))
+  kelly_plot_style()
 
 ggsave(
   file = 'beats.png', 
@@ -377,19 +391,23 @@ ggsave(
   path = 'simulation_plots'
 )
 
-graph_ties <- ggplot(percent_win, aes(x = time, y = ties_discrete_kelly_count, color = strategy)) +
+graph_ties <- ggplot(
+  data = percent_win, 
+  aes(
+    x = time, 
+    y = ties_discrete_kelly_count, 
+    color = strategy,
+    label = strategy
+    )
+  ) +
+  kelly_plot_style() +
   geom_line() +
-  scale_colour_manual(name ="Bet Strategy", values = my_colors) +
   ggtitle(
     "Discrete Kelly vs. alternative strategies (1000 runs)", 
     "(Probability = .525, Odds = 1, Bets = powers of 2, Initial Bankroll = 100)"
   ) +
   ylab("# of Runs Tying Discrete Kelly") +
-  xlab("Time") +
-  theme_bw() +
-  theme(legend.position = "none") +
-  geom_dl(aes(label = strategy), method = list(dl.trans(x = x + .3), "last.bumpup")) +
-  scale_x_continuous(expand = expansion(mult = c(0.05, .5)))
+  xlab("Time")
 
 ggsave(
   file = 'ties.png', 
@@ -425,8 +443,6 @@ ggsave(
 #   ylab("# of Runs w/ Maximal Bankroll") +
 #   xlab("Time") +
 #   theme_bw() +
-#   theme(legend.position = "none") +
-#   geom_dl(aes(label = strategy), method = list(dl.trans(x = x + .3), "last.bumpup")) +
 #   scale_x_continuous(expand = expansion(mult = c(0.05, .5)))
 # 
 # ggsave(
