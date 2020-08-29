@@ -195,7 +195,7 @@ bet_sim <- function(initial_bankroll, odds, probability, possible_bets, num_bets
   )
 }
 
-# Simulate a series of runs and take the average bankroll at each step
+# Simulate a series of runs and save all data
 multiple_sim <- function(initial_bankroll, odds, probability, possible_bets, num_bets, num_sims){
   replicate(
     n = num_sims, 
@@ -221,6 +221,8 @@ multiple_run <- multiple_sim(
 
 save.image(file = "data/1K_runs_with_0_bet.Rdata")
 
+multiple_run %<>% select(-c(max_discrete_bankroll, random_discrete_bankroll))
+
 clean_strategy_name <- function(name){
   case_when(
     grepl('discrete_kelly', name) ~ 'Discrete Kelly',
@@ -233,6 +235,10 @@ clean_strategy_name <- function(name){
     as_factor()
 }
 
+strategy_is_kelly <- function(strategy){
+  ifelse(strategy == 'Kelly', 'dashed', 'solid')
+}
+
 # Define colors for lines in graphs to follow
 # Colors are persistent across graphs
 my_colors <- RColorBrewer::brewer.pal(6, "Dark2")
@@ -243,13 +249,32 @@ names(my_colors) <- colnames(multiple_run) %>%
   .$value
 
 # Define common style for graphs
-kelly_plot_style <- function(){
-  list(
-    theme_bw(),
-    scale_colour_manual(name = "Bet Strategy", values = my_colors, guide = "none"),
-    geom_dl(method = list('last.bumpup', dl.trans(x = x + .2), cex = .85, hjust = 0)),
-    scale_x_continuous(expand = expansion(mult = c(0, .3)))
-  )
+kelly_plot_style <- function(chart_type){
+  if(chart_type == 'line'){
+    list(
+      theme_bw(),
+      scale_colour_manual(
+        name = "Bet Strategy",
+        values = my_colors,
+        guide = "none"
+        ),
+      geom_dl(
+        method = list(
+          'last.bumpup', 
+          dl.trans(x = x + .2), 
+          cex = .85,
+          hjust = 0
+          )
+        ),
+      scale_x_continuous(expand = expansion(mult = c(0, .3))) 
+    )
+  }
+  else if(chart_type == 'bar'){
+    list(
+      theme_bw(),
+      scale_fill_manual(name = "Bet Strategy", values = my_colors, guide = "none")
+    )
+  }
 }
 
 # median bankroll at each point in time
@@ -261,18 +286,26 @@ medians <- multiple_run %>%
             kelly_bankroll = median(kelly_bankroll)) %>%
   gather(key = 'strategy', value = 'bankroll', -time) %>%
   # clean up column value for graph
-  mutate(strategy = clean_strategy_name(strategy))
+  mutate(
+    strategy = clean_strategy_name(strategy),
+    is_kelly = strategy_is_kelly(strategy)
+  )
 
 graph_medians <- ggplot(
   data = medians,
-  mapping = aes(x = time, y = bankroll, color = strategy, label = strategy)
+  mapping = aes(
+    x = time, 
+    y = bankroll, 
+    color = strategy, 
+    label = strategy
+    )
 ) +
-  kelly_plot_style() +
+  kelly_plot_style('line') +
   geom_line() +
-  ggtitle(
-    "Median bankroll over time (1000 runs)", 
-    "(Probability = .525, Odds = 1, Bets = powers of 2, Initial Bankroll = 100)"
-  ) +
+  # ggtitle(
+  #   "Median bankroll over time (1000 runs)", 
+  #   "(Probability = .525, Odds = 1, Bets = powers of 2, Initial Bankroll = 100)"
+  # ) +
   ylab("Median bankroll") +
   xlab("Time") +
   scale_y_continuous(trans='log10', expand = expansion(mult = c(0, .1)))
@@ -280,7 +313,7 @@ graph_medians <- ggplot(
 ggsave(
   file = 'medians.png', 
   plot = graph_medians, 
-  width= 6, 
+  width = 6, 
   height = 4, 
   path = 'simulation_plots'
 )
@@ -294,18 +327,26 @@ means <- multiple_run %>%
             kelly_bankroll = mean(kelly_bankroll)) %>%
   gather(key = 'strategy', value = 'bankroll', -time) %>%
   # clean up column value for graph
-  mutate(strategy = clean_strategy_name(strategy))
+  mutate(
+    strategy = clean_strategy_name(strategy),
+    is_kelly = strategy_is_kelly(strategy)
+  )
   
 graph_means <- ggplot(
   data = means,
-  mapping = aes(x = time, y = bankroll, color = strategy, label = strategy)
+  mapping = aes(
+    x = time, 
+    y = bankroll, 
+    color = strategy, 
+    label = strategy
+    )
 ) +
-  kelly_plot_style() +
+  kelly_plot_style('line') +
   geom_line() +
-  ggtitle(
-    "Mean bankroll over time (1000 runs)", 
-    "(Probability = .525, Odds = 1, Bets = powers of 2, Initial Bankroll = 100)"
-  ) +
+  # ggtitle(
+  #   "Mean bankroll over time (1000 runs)", 
+  #   "(Probability = .525, Odds = 1, Bets = powers of 2, Initial Bankroll = 100)"
+  # ) +
   ylab("Mean bankroll") +
   xlab("Time") +
   scale_y_continuous(trans='log10', expand = expansion(mult = c(0, .1)))
@@ -313,7 +354,7 @@ graph_means <- ggplot(
 ggsave(
   file = 'means.png', 
   plot = graph_means, 
-  width= 6, 
+  width = 6, 
   height = 4, 
   path = 'simulation_plots'
 )
@@ -333,34 +374,39 @@ percent_win <- multiple_run %>%
   group_by(time, strategy) %>%
   summarise(
     beats_discrete_kelly_count = sum(beats_discrete_kelly),
-    ties_discrete_kelly_count = sum(ties_discrete_kelly)
+    ties_discrete_kelly_count = sum(ties_discrete_kelly),
+    total_count = n()
   ) %>%
   mutate(beats_or_ties_discrete_kelly_count = beats_discrete_kelly_count + ties_discrete_kelly_count) %>%
   # clean up column value for graph
-  mutate(strategy = clean_strategy_name(strategy))
+  mutate(
+    strategy = clean_strategy_name(strategy),
+    is_kelly = strategy_is_kelly(strategy)
+  )
 
 graph_beat_or_tie <- ggplot(
   data = percent_win, 
   aes(
     x = time, 
-    y = beats_or_ties_discrete_kelly_count, 
+    y = beats_or_ties_discrete_kelly_count / total_count, 
     color = strategy,
     label = strategy
   )
 ) +
-  kelly_plot_style() +
+  kelly_plot_style('line') +
   geom_line() +
-  ggtitle(
-    "Discrete Kelly vs. alternative strategies (1000 runs)", 
-    "(Probability = .525, Odds = 1, Bets = powers of 2, Initial Bankroll = 100)"
-  ) +
-  ylab("# of Runs Beating or Tying Discrete Kelly") +
+  # ggtitle(
+  #   "Discrete Kelly vs. alternative strategies (1000 runs)", 
+  #   "(Probability = .525, Odds = 1, Bets = powers of 2, Initial Bankroll = 100)"
+  # ) +
+  scale_y_continuous(labels = scales::percent) +
+  ylab("% of Runs Beating or Tying Discrete Kelly") +
   xlab("Time")
 
 ggsave(
   file = 'beat_or_tie.png', 
   plot = graph_beat_or_tie, 
-  width= 6, 
+  width = 6, 
   height = 4, 
   path = 'simulation_plots'
 )
@@ -369,24 +415,25 @@ graph_beats <- ggplot(
   data = percent_win, 
   aes(
     x = time, 
-    y = beats_discrete_kelly_count, 
+    y = beats_discrete_kelly_count / total_count, 
     color = strategy,
     label = strategy
   )
-) +  
+) +
+  kelly_plot_style('line') +
   geom_line() +
-  ggtitle(
-    "Discrete Kelly vs. alternative strategies (1000 runs)", 
-    "(Probability = .525, Odds = 1, Bets = powers of 2, Initial Bankroll = 100)"
-  ) +
-  ylab("# of Runs Beating Discrete Kelly") +
-  xlab("Time") +
-  kelly_plot_style()
+  # ggtitle(
+  #   "Discrete Kelly vs. alternative strategies (1000 runs)", 
+  #   "(Probability = .525, Odds = 1, Bets = powers of 2, Initial Bankroll = 100)"
+  # ) +
+  scale_y_continuous(labels = scales::percent) +
+  ylab("% of Runs Beating Discrete Kelly") +
+  xlab("Time")
 
 ggsave(
   file = 'beats.png', 
   plot = graph_beats, 
-  width= 6, 
+  width = 6, 
   height = 4, 
   path = 'simulation_plots'
 )
@@ -400,147 +447,64 @@ graph_ties <- ggplot(
     label = strategy
     )
   ) +
-  kelly_plot_style() +
+  kelly_plot_style('line') +
   geom_line() +
-  ggtitle(
-    "Discrete Kelly vs. alternative strategies (1000 runs)", 
-    "(Probability = .525, Odds = 1, Bets = powers of 2, Initial Bankroll = 100)"
-  ) +
+  # ggtitle(
+  #   "Discrete Kelly vs. alternative strategies (1000 runs)", 
+  #   "(Probability = .525, Odds = 1, Bets = powers of 2, Initial Bankroll = 100)"
+  # ) +
   ylab("# of Runs Tying Discrete Kelly") +
   xlab("Time")
 
 ggsave(
   file = 'ties.png', 
   plot = graph_ties, 
-  width= 6, 
+  width = 6, 
   height = 4, 
   path = 'simulation_plots'
 )
 
-# at this point we narrow down to discrete kelly and closest bookend
-# and see how many times each is ahead
+gone_broke <- multiple_run %>%
+  select(-c(diff_bet, bet_result)) %>%
+  filter(time >= (max(time) - 1)) %>% # last and next to last betting cycle
+  pivot_longer(
+    cols = ends_with('bankroll'),
+    names_to = 'strategy',
+    values_to = 'strategy_bankroll'
+  ) %>%
+  group_by(strategy, sim_no) %>%
+  summarise(
+    run_gone_broke = 
+      min(strategy_bankroll) == 0 || # bankroll hit zero
+      length(unique(strategy_bankroll)) == 1
+      ) %>%
+  # clean up column value for graph
+  mutate(
+    strategy = clean_strategy_name(strategy),
+    is_kelly = strategy_is_kelly(strategy)
+    )
 
-# percent_win <- multiple_run %>%
-#   select(-c(diff_bet, bet_result, kelly_bankroll)) %>%
-#   gather(key = 'strategy', value = 'bankroll', -one_of(c('sim_no', 'time'))) %>%
-#   group_by(sim_no, time) %>%
-#   filter(bankroll == max(bankroll)) %>%
-#   group_by(time, strategy) %>%
-#   summarise(best_count = n()) %>%
-#   # clean up column value for graph
-#   mutate(strategy = clean_strategy_name(strategy))
-# 
-# graph_percent_win <- ggplot(
-#   data = percent_win,
-#   mapping = aes(x = time, y = best_count, color = strategy)
-# ) +
-#   geom_line() +
-#   scale_colour_manual(name  ="Bet Strategy", values = my_colors) +
-#   ggtitle(
-#     "Which strategy is 'winning' at each point in time? (1000 runs)", 
-#     "(Probability = .525, Odds = 1, Bets = powers of 2, Initial Bankroll = 100)"
-#   ) +
-#   ylab("# of Runs w/ Maximal Bankroll") +
-#   xlab("Time") +
-#   theme_bw() +
-#   scale_x_continuous(expand = expansion(mult = c(0.05, .5)))
-# 
-# ggsave(
-#   file = 'percent_win.png', 
-#   plot = graph_percent_win, 
-#   width= 6, 
-#   height = 4, 
-#   path = 'simulation_plots'
-# )
+# if we want all the strategies, need to lessen text size
+graph_gone_broke <- gone_broke %>%
+  group_by(strategy) %>%
+  summarise(times_gone_broke = sum(run_gone_broke) / n()) %>%
+  ggplot(
+    aes(
+      x = reorder(strategy, -times_gone_broke),
+      y = times_gone_broke,
+      fill = strategy
+      )
+    ) +
+  kelly_plot_style('bar') +
+  geom_bar(stat = "identity") +
+  scale_y_continuous(labels = scales::percent) +
+  ylab("% of Runs Gone Broke") +
+  xlab("Betting Strategy")
 
-# now we look at the final distribution -- as total $, and as a % of discrete kelly
-# 
-# ending_distribution <- multiple_run %>%
-#   filter(time == max(time)) %>%
-#   select(sim_no, time, discrete_kelly_bankroll, closest_bookend_bankroll, random_bookend_bankroll, kelly_bankroll) %>%
-#   gather(key = 'strategy', value = 'bankroll', -one_of(c('sim_no', 'time'))) %>%
-#   # clean up column value for graph
-#   mutate(strategy = clean_strategy_name(strategy))
-# 
-# graph_ending_distribution <- ggplot(
-#   data = ending_distribution,
-#   mapping = aes(x = bankroll, color = strategy)
-# ) +
-#   geom_density(size = 1) +
-#   scale_colour_manual(name  ="Bet Strategy", values = my_colors) +
-#   ggtitle(
-#     "Ending bankroll distribution (1000 runs)", 
-#     "(Probability = .525, Odds = 1, Bets = powers of 2, Initial Bankroll = 100)"
-#   ) +
-#   xlab("Bankroll") +
-#   theme_bw() +
-#   scale_x_continuous(trans='log10')
-# 
-# ggsave(
-#   file = 'ending_distribution.png', 
-#   plot = graph_ending_distribution, 
-#   width= 6, 
-#   height = 4, 
-#   path = 'simulation_plots'
-# )
-# 
-# # (0/0) -> NaN # if both bankrolls are zero, output is NaN
-# # (x/0) -> Inf
-# # (0/x) -> 0
-# 
-# ending_distribution_as_percent <- multiple_run %>%
-#   filter(time == max(time)) %>%
-#   mutate(
-#     closest_bookend_frac = closest_bookend_bankroll / discrete_kelly_bankroll,
-#     random_bookend_frac = random_bookend_bankroll / discrete_kelly_bankroll,
-#     kelly_frac = kelly_bankroll / discrete_kelly_bankroll
-#   ) %>%
-#   select(sim_no, time, closest_bookend_frac, random_bookend_frac, kelly_frac) %>%
-#   gather(key = 'strategy', value = 'bankroll', -one_of(c('sim_no', 'time'))) %>%
-#   # clean up column value for graph
-#   mutate(strategy = clean_strategy_name(strategy))
-# 
-# 
-# graph_ending_distribution_as_percent_c_bookend <- ending_distribution_as_percent %>%
-#   filter(strategy == 'Closest Bookend') %>%
-#   ggplot(
-#     mapping = aes(x = bankroll)
-#   ) +
-#   geom_density(size = 1) +
-#   scale_colour_manual(name  ="Bet Strategy", values = my_colors) +
-#   ggtitle(
-#     "Bankroll distribution - closest bookend vs. discrete kelly (1000 runs)", 
-#     "(Probability = .525, Odds = 1, Bets = powers of 2, Initial Bankroll = 100)"
-#   ) +
-#   xlab("Closest Bookend Bankroll / Discrete Kelly Bankroll") +
-#   theme_bw()
-# 
-# ggsave(
-#   file = 'ending_distribution_as_percent_c_bookend.png', 
-#   plot = graph_ending_distribution_as_percent_c_bookend, 
-#   width= 6, 
-#   height = 4, 
-#   path = 'simulation_plots'
-# )
-# 
-# graph_ending_distribution_as_percent_r_bookend <- ending_distribution_as_percent %>%
-#   filter(strategy == 'Random Bookend') %>%
-#   ggplot(
-#     mapping = aes(x = bankroll)
-#   ) +
-#   geom_density(size = 1) +
-#   scale_colour_manual(name  ="Bet Strategy", values = my_colors) +
-#   ggtitle(
-#     "Bankroll distribution - random bookend vs. discrete kelly (1000 runs)", 
-#     "(Probability = .525, Odds = 1, Bets = powers of 2, Initial Bankroll = 100)"
-#   ) +
-#   xlab("Random Bookend Bankroll / Discrete Kelly Bankroll") +
-#   theme_bw()
-# 
-# ggsave(
-#   file = 'ending_distribution_as_percent_r_bookend.png', 
-#   plot = graph_ending_distribution_as_percent_r_bookend, 
-#   width= 6, 
-#   height = 4, 
-#   path = 'simulation_plots'
-# )
+ggsave(
+  file = 'gone_broke.png', 
+  plot = graph_gone_broke, 
+  width = 6, 
+  height = 4, 
+  path = 'simulation_plots'
+)
