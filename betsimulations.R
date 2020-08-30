@@ -181,7 +181,7 @@ bet_sim <- function(initial_bankroll, odds, probability, possible_bets, num_bets
       )
     }
   return (
-    data.frame(
+    tibble(
       time = 0:num_bets, 
       bet_result, 
       kelly_bankroll, 
@@ -216,10 +216,10 @@ multiple_run <- multiple_sim(
   # allow option for no bet
   possible_bets = c(0, 2^seq(0, 1023)),
   num_bets = 10^4,
-  num_sims = 1 * 10^3
+  num_sims = 10^4
 )
 
-save.image(file = "data/1K_runs_with_0_bet.Rdata")
+save(multiple_run, file = 'data/10K_runs.Rdata')
 
 multiple_run %<>% select(-c(max_discrete_bankroll, random_discrete_bankroll))
 
@@ -438,31 +438,31 @@ ggsave(
   path = 'simulation_plots'
 )
 
-graph_ties <- ggplot(
-  data = percent_win, 
-  aes(
-    x = time, 
-    y = ties_discrete_kelly_count, 
-    color = strategy,
-    label = strategy
-    )
-  ) +
-  kelly_plot_style('line') +
-  geom_line() +
-  # ggtitle(
-  #   "Discrete Kelly vs. alternative strategies (1000 runs)", 
-  #   "(Probability = .525, Odds = 1, Bets = powers of 2, Initial Bankroll = 100)"
-  # ) +
-  ylab("# of Runs Tying Discrete Kelly") +
-  xlab("Time")
-
-ggsave(
-  file = 'ties.png', 
-  plot = graph_ties, 
-  width = 6, 
-  height = 4, 
-  path = 'simulation_plots'
-)
+# graph_ties <- ggplot(
+#   data = percent_win, 
+#   aes(
+#     x = time, 
+#     y = ties_discrete_kelly_count, 
+#     color = strategy,
+#     label = strategy
+#     )
+#   ) +
+#   kelly_plot_style('line') +
+#   geom_line() +
+#   # ggtitle(
+#   #   "Discrete Kelly vs. alternative strategies (1000 runs)", 
+#   #   "(Probability = .525, Odds = 1, Bets = powers of 2, Initial Bankroll = 100)"
+#   # ) +
+#   ylab("# of Runs Tying Discrete Kelly") +
+#   xlab("Time")
+# 
+# ggsave(
+#   file = 'ties.png', 
+#   plot = graph_ties, 
+#   width = 6, 
+#   height = 4, 
+#   path = 'simulation_plots'
+# )
 
 gone_broke <- multiple_run %>%
   select(-c(diff_bet, bet_result)) %>%
@@ -508,3 +508,4 @@ ggsave(
   height = 4, 
   path = 'simulation_plots'
 )
+
