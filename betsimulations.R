@@ -1,4 +1,5 @@
 library(tidyverse)
+library(magrittr)
 library(directlabels)
 
 # Expected Logarithmic Growth
@@ -209,17 +210,19 @@ multiple_sim <- function(initial_bankroll, odds, probability, possible_bets, num
 
 set.seed(0)
 
-multiple_run <- multiple_sim(
-  initial_bankroll = 100, 
-  odds = 1, 
-  probability = .525,
-  # allow option for no bet
-  possible_bets = c(0, 2^seq(0, 1023)),
-  num_bets = 10^4,
-  num_sims = 10^4
-)
+# multiple_run <- multiple_sim(
+#   initial_bankroll = 100, 
+#   odds = 1, 
+#   probability = .525,
+#   # allow option for no bet
+#   possible_bets = c(0, 2^seq(0, 1023)),
+#   num_bets = 10^4,
+#   num_sims = 10^4
+# )
 
-save(multiple_run, file = 'data/10K_runs.Rdata')
+# save(multiple_run, file = 'data/10K_runs.Rdata')
+load('data/10K_runs.Rdata')
+
 
 multiple_run %<>% select(-c(max_discrete_bankroll, random_discrete_bankroll))
 
@@ -230,13 +233,13 @@ clean_strategy_name <- function(name){
     grepl('random_bookend', name) ~ 'Random Bookend',
     grepl('random_discrete', name) ~ 'Random',
     grepl('max_discrete', name) ~ 'Maximum',
-    grepl('kelly', name) ~ 'Kelly'
+    grepl('kelly', name) ~ 'Theoretical Kelly'
   ) %>%
     as_factor()
 }
 
 strategy_is_kelly <- function(strategy){
-  ifelse(strategy == 'Kelly', 'dashed', 'solid')
+  ifelse(strategy == 'Theoretical Kelly', 'dashed', 'solid')
 }
 
 # Define colors for lines in graphs to follow
@@ -266,7 +269,7 @@ kelly_plot_style <- function(chart_type){
           hjust = 0
           )
         ),
-      scale_x_continuous(expand = expansion(mult = c(0, .3))) 
+      scale_x_continuous(expand = expansion(mult = c(0, .35))) 
     )
   }
   else if(chart_type == 'bar'){
@@ -302,13 +305,12 @@ graph_medians <- ggplot(
 ) +
   kelly_plot_style('line') +
   geom_line() +
-  # ggtitle(
-  #   "Median bankroll over time (1000 runs)", 
-  #   "(Probability = .525, Odds = 1, Bets = powers of 2, Initial Bankroll = 100)"
-  # ) +
   ylab("Median bankroll") +
   xlab("Time") +
-  scale_y_continuous(trans='log10', expand = expansion(mult = c(0, .1)))
+  scale_y_continuous(
+    trans='log10',
+    expand = expansion(mult = c(0, .1))
+    )
 
 ggsave(
   file = 'medians.png', 
@@ -343,10 +345,6 @@ graph_means <- ggplot(
 ) +
   kelly_plot_style('line') +
   geom_line() +
-  # ggtitle(
-  #   "Mean bankroll over time (1000 runs)", 
-  #   "(Probability = .525, Odds = 1, Bets = powers of 2, Initial Bankroll = 100)"
-  # ) +
   ylab("Mean bankroll") +
   xlab("Time") +
   scale_y_continuous(trans='log10', expand = expansion(mult = c(0, .1)))
@@ -395,10 +393,6 @@ graph_beat_or_tie <- ggplot(
 ) +
   kelly_plot_style('line') +
   geom_line() +
-  # ggtitle(
-  #   "Discrete Kelly vs. alternative strategies (1000 runs)", 
-  #   "(Probability = .525, Odds = 1, Bets = powers of 2, Initial Bankroll = 100)"
-  # ) +
   scale_y_continuous(labels = scales::percent) +
   ylab("% of Runs Beating or Tying Discrete Kelly") +
   xlab("Time")
@@ -422,10 +416,6 @@ graph_beats <- ggplot(
 ) +
   kelly_plot_style('line') +
   geom_line() +
-  # ggtitle(
-  #   "Discrete Kelly vs. alternative strategies (1000 runs)", 
-  #   "(Probability = .525, Odds = 1, Bets = powers of 2, Initial Bankroll = 100)"
-  # ) +
   scale_y_continuous(labels = scales::percent) +
   ylab("% of Runs Beating Discrete Kelly") +
   xlab("Time")
@@ -437,32 +427,6 @@ ggsave(
   height = 4, 
   path = 'simulation_plots'
 )
-
-# graph_ties <- ggplot(
-#   data = percent_win, 
-#   aes(
-#     x = time, 
-#     y = ties_discrete_kelly_count, 
-#     color = strategy,
-#     label = strategy
-#     )
-#   ) +
-#   kelly_plot_style('line') +
-#   geom_line() +
-#   # ggtitle(
-#   #   "Discrete Kelly vs. alternative strategies (1000 runs)", 
-#   #   "(Probability = .525, Odds = 1, Bets = powers of 2, Initial Bankroll = 100)"
-#   # ) +
-#   ylab("# of Runs Tying Discrete Kelly") +
-#   xlab("Time")
-# 
-# ggsave(
-#   file = 'ties.png', 
-#   plot = graph_ties, 
-#   width = 6, 
-#   height = 4, 
-#   path = 'simulation_plots'
-# )
 
 gone_broke <- multiple_run %>%
   select(-c(diff_bet, bet_result)) %>%
@@ -509,3 +473,7 @@ ggsave(
   path = 'simulation_plots'
 )
 
+gone_broke %>%
+  group_by(strategy) %>%
+  summarise(times_gone_broke = sum(run_gone_broke) / n()) %>%
+  write_csv(path = 'data/gone_broke.csv')

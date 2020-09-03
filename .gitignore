@@ -4,3 +4,5 @@
 *.Rproj.user
 *.Rdata
 .Rproj.user
+*.csv
+.Renviron

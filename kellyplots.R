@@ -20,7 +20,7 @@ kelly <- function(odds, probability) {
 # calculate the utility of each discrete bet bet_amount and label the best bet
 create_universal_set <- function(bankroll, bet_amount, probability, odds){
   # add kelly to the list of supplied bet bet_amounts
-  bet_amount = c(bet_amount, "kelly")
+  bet_amount = c(bet_amount, "Theoretical Kelly")
   univ = expand_grid(
     bet_amount = bet_amount,
     bankroll = bankroll, 
@@ -28,7 +28,7 @@ create_universal_set <- function(bankroll, bet_amount, probability, odds){
     odds = odds
     ) %>%
     mutate(
-      is_kelly = if_else(bet_amount == "kelly", "Kelly", "non-Kelly"),
+      is_kelly = if_else(bet_amount == "Theoretical Kelly", "Kelly", "non-Kelly"),
       # keep a factorized version of the bet bet_amount around to label graphs
       bet_amount_color = as_factor(bet_amount),
       # calculate the kelly bet amount
@@ -110,7 +110,7 @@ graph_varyp <- create_universal_set(
   scale_colour_brewer(
     name = "Bet Amount",
     # need to order bets appropriately
-    breaks = c("1", "2", "5", "10", "25", "50", "kelly"), 
+    breaks = c("1", "2", "5", "10", "25", "50", "Theoretical Kelly"), 
     type = 'qual',
     palette = 'Set2'
     ) +
@@ -178,7 +178,7 @@ graph_varya <- create_universal_set(
   scale_colour_brewer(
     name = "Bet Amount",
     # need to order bets appropriately
-    breaks = c("1000", "2000", "5000", "10000", "25000", "50000", "kelly"), 
+    breaks = c("1000", "2000", "5000", "10000", "25000", "50000", "Theoretical Kelly"), 
     type = 'qual',
     palette = 'Set2'
   ) +
@@ -246,7 +246,7 @@ graph_varyb <- create_universal_set(
   scale_colour_brewer(
     name = "Bet Amount",
     # need to order bets appropriately
-    breaks = c("1", "2", "5", "10", "25", "50", "kelly"), 
+    breaks = c("1", "2", "5", "10", "25", "50", "Theoretical Kelly"), 
     type = 'qual',
     palette = 'Set2'
   ) +
