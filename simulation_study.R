@@ -1,6 +1,7 @@
 library(tidyverse)
 library(magrittr)
 library(directlabels)
+library(ggrepel)
 
 # Expected Logarithmic Growth
 EV <- function(odds, probability, bankroll, bet){
@@ -238,13 +239,13 @@ clean_strategy_name <- function(name){
     as_factor()
 }
 
-strategy_is_kelly <- function(strategy){
-  ifelse(strategy == 'Theoretical Kelly', 'dashed', 'solid')
-}
+# strategy_is_kelly <- function(strategy){
+#   ifelse(strategy == 'Theoretical Kelly', 'dashed', 'solid')
+# }
 
 # Define colors for lines in graphs to follow
 # Colors are persistent across graphs
-my_colors <- RColorBrewer::brewer.pal(6, "Dark2")
+my_colors <- RColorBrewer::brewer.pal(4, "Dark2")
 names(my_colors) <- colnames(multiple_run) %>%
   as_tibble() %>%
   filter(grepl('bankroll', value)) %>%
@@ -269,13 +270,20 @@ kelly_plot_style <- function(chart_type){
           hjust = 0
           )
         ),
-      scale_x_continuous(expand = expansion(mult = c(0, .35))) 
+      scale_x_continuous(expand = expansion(mult = c(0, .35))),
+      scale_linetype_manual(values = c("dotted", "solid"), guide = "none")
     )
   }
   else if(chart_type == 'bar'){
     list(
       theme_bw(),
       scale_fill_manual(name = "Bet Strategy", values = my_colors, guide = "none")
+    )
+  }
+  else if(chart_type == 'point'){
+    list(
+      theme_bw(),
+      scale_color_manual(name = "Bet Strategy", values = my_colors, guide = "none")
     )
   }
 }
@@ -288,23 +296,31 @@ medians <- multiple_run %>%
             closest_bookend_bankroll = median(closest_bookend_bankroll),
             kelly_bankroll = median(kelly_bankroll)) %>%
   gather(key = 'strategy', value = 'bankroll', -time) %>%
-  # clean up column value for graph
   mutate(
+    # clean up column value for graph
     strategy = clean_strategy_name(strategy),
-    is_kelly = strategy_is_kelly(strategy)
+    # The discrete kelly and closest bookend strategies produce very similar
+    # bankrolls, and as a result are tough to discern in the graph.
+    # So, we change their linetype to 'dotted' so that both colors can be seen.
+    strategy_linetype = if_else(
+      strategy %in% c('Discrete Kelly', 'Closest Bookend'), 
+      'dotted', 
+      'solid'
+      )
   )
-
+  
 graph_medians <- ggplot(
   data = medians,
   mapping = aes(
     x = time, 
     y = bankroll, 
     color = strategy, 
-    label = strategy
+    label = strategy,
+    linetype = strategy_linetype
     )
 ) +
-  kelly_plot_style('line') +
   geom_line() +
+  kelly_plot_style('line') +
   ylab("Median bankroll") +
   xlab("Time") +
   scale_y_continuous(
@@ -330,8 +346,7 @@ means <- multiple_run %>%
   gather(key = 'strategy', value = 'bankroll', -time) %>%
   # clean up column value for graph
   mutate(
-    strategy = clean_strategy_name(strategy),
-    is_kelly = strategy_is_kelly(strategy)
+    strategy = clean_strategy_name(strategy)
   )
   
 graph_means <- ggplot(
@@ -347,7 +362,10 @@ graph_means <- ggplot(
   geom_line() +
   ylab("Mean bankroll") +
   xlab("Time") +
-  scale_y_continuous(trans='log10', expand = expansion(mult = c(0, .1)))
+  scale_y_continuous(
+    trans='log10', 
+    expand = expansion(mult = c(0, .1))
+    )
 
 ggsave(
   file = 'means.png', 
@@ -378,8 +396,7 @@ percent_win <- multiple_run %>%
   mutate(beats_or_ties_discrete_kelly_count = beats_discrete_kelly_count + ties_discrete_kelly_count) %>%
   # clean up column value for graph
   mutate(
-    strategy = clean_strategy_name(strategy),
-    is_kelly = strategy_is_kelly(strategy)
+    strategy = clean_strategy_name(strategy)
   )
 
 graph_beat_or_tie <- ggplot(
@@ -428,6 +445,29 @@ ggsave(
   path = 'simulation_plots'
 )
 
+# see details on runs where discrete kelly lost
+# within_sim_details <- multiple_run %>%
+#   # group_by(sim_no) %>%
+#   # mutate(bet_result_percent = mean(bet_result, na.rm = TRUE)) %>%
+#   # ungroup() %>%
+#   filter(time == max(time)) %>%
+#   mutate(
+#     random_bookend_beats_or_ties_discrete_kelly = 
+#       as_factor(random_bookend_bankroll >= discrete_kelly_bankroll),
+#     discrete_kelly_beats_theoretical_kelly = 
+#       as_factor(discrete_kelly_bankroll > kelly_bankroll)    
+#   ) %>%
+#   group_by(
+#     random_bookend_beats_or_ties_discrete_kelly,
+#     discrete_kelly_beats_theoretical_kelly
+#   ) %>%
+#   count()
+#   select(
+#     sim_no,
+#     random_bookend_beats_or_ties_discrete_kelly,
+#     discrete_kelly_beats_theoretical_kelly
+#   )
+
 gone_broke <- multiple_run %>%
   select(-c(diff_bet, bet_result)) %>%
   filter(time >= (max(time) - 1)) %>% # last and next to last betting cycle
@@ -444,11 +484,9 @@ gone_broke <- multiple_run %>%
       ) %>%
   # clean up column value for graph
   mutate(
-    strategy = clean_strategy_name(strategy),
-    is_kelly = strategy_is_kelly(strategy)
-    )
+    strategy = clean_strategy_name(strategy)
+  )
 
-# if we want all the strategies, need to lessen text size
 graph_gone_broke <- gone_broke %>%
   group_by(strategy) %>%
   summarise(times_gone_broke = sum(run_gone_broke) / n()) %>%
@@ -473,7 +511,97 @@ ggsave(
   path = 'simulation_plots'
 )
 
-gone_broke %>%
+gone_broke_summarised <- gone_broke %>%
   group_by(strategy) %>%
-  summarise(times_gone_broke = sum(run_gone_broke) / n()) %>%
+  summarise(freq_gone_broke = sum(run_gone_broke) / n()) 
+
+gone_broke_summarised %>%
   write_csv(path = 'data/gone_broke.csv')
+
+# geometric means
+gm_mean = function(x, na.rm=TRUE){
+  exp(sum(log(x[x > 0]), na.rm=na.rm) / length(x[x > 0]))
+}
+
+gm_means <- multiple_run %>%
+  group_by(time) %>%
+  summarise(discrete_kelly_bankroll = gm_mean(discrete_kelly_bankroll),
+            random_bookend_bankroll = gm_mean(random_bookend_bankroll),
+            closest_bookend_bankroll = gm_mean(closest_bookend_bankroll),
+            kelly_bankroll = gm_mean(kelly_bankroll)) %>%
+  gather(key = 'strategy', value = 'geometric_mean_bankroll', -time) %>%
+  # clean up column value for graph
+  mutate(
+    strategy = clean_strategy_name(strategy)
+  )
+
+graph_gm_mean_and_gone_broke <- gone_broke_summarised %>%
+  mutate(freq_not_gone_broke = 1 - freq_gone_broke) %>%
+  left_join(gm_means %>% filter(time == max(time))) %>%
+  # filter(strategy != 'Theoretical Kelly') %>% 
+  ggplot(
+    mapping = aes(
+      x = freq_not_gone_broke, 
+      y = geometric_mean_bankroll,
+      color = strategy,
+      label = strategy
+      )
+  ) +
+  kelly_plot_style('point') +
+  geom_point(size = 2.5) + 
+  geom_label_repel(
+    box.padding = 1.5, 
+    point.padding = 0.25
+  ) +
+  scale_x_continuous(labels = scales::percent) +
+  scale_y_continuous(trans='log10') +
+  xlab("% of Runs Not Gone Broke") +
+  ylab("Geometric Mean of Final Bankroll")
+
+ggsave(
+  file = 'gm_mean_and_gone_broke.png', 
+  plot = graph_gm_mean_and_gone_broke, 
+  width = 6, 
+  height = 4, 
+  path = 'simulation_plots'
+)
+
+# time series
+graph_gm_mean <- 
+  gm_means %>%
+  ggplot(
+  mapping = aes(
+    x = time, 
+    y = geometric_mean_bankroll, 
+    color = strategy, 
+    label = strategy
+  )
+) +
+  kelly_plot_style('line') +
+  geom_line() +
+  ylab("Geometric Mean bankroll") +
+  xlab("Time") +
+  scale_y_continuous(
+    trans='log10', 
+    expand = expansion(mult = c(0, .1))
+  )
+
+ggsave(
+  file = 'gm_mean.png', 
+  plot = graph_gm_mean, 
+  width = 6, 
+  height = 4, 
+  path = 'simulation_plots'
+)
+
+# gm_means <- multiple_run %>%
+#   group_by(time) %>%
+#   summarise(discrete_kelly_bankroll = gm_mean(discrete_kelly_bankroll),
+#             random_bookend_bankroll = gm_mean(random_bookend_bankroll),
+#             closest_bookend_bankroll = gm_mean(closest_bookend_bankroll),
+#             kelly_bankroll = gm_mean(kelly_bankroll)) %>%
+#   gather(key = 'strategy', value = 'geometric mean bankroll', -time) %>%
+#   # clean up column value for graph
+#   mutate(
+#     strategy = clean_strategy_name(strategy)
+#   )

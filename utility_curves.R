@@ -16,7 +16,7 @@ kelly <- function(odds, probability) {
   (probability * (odds + 1) - 1) / odds
 }
 
-# create dataset with varying odds, bankroll, and probability
+# create data set with varying odds, bankroll, and probability
 # calculate the utility of each discrete bet bet_amount and label the best bet
 create_universal_set <- function(bankroll, bet_amount, probability, odds){
   # add kelly to the list of supplied bet bet_amounts
@@ -56,7 +56,8 @@ create_universal_set <- function(bankroll, bet_amount, probability, odds){
       odds, 
       probability, 
       bankroll, 
-      best_bet = bet_amount_color, 
+      best_bet_color = bet_amount_color,
+      best_bet = bet_amount,
       best_utility = utility
       )
   
@@ -106,7 +107,7 @@ graph_varyp <- create_universal_set(
   # lines for each bet amount
   geom_line(aes(color = bet_amount_color, linetype = is_kelly), size = 1) +
   # shaded area for best bet
-  geom_ribbon(aes(ymin = 0, ymax = .1, fill = best_bet), alpha = .1) +
+  geom_ribbon(aes(ymin = 0, ymax = .1, fill = best_bet_color), alpha = .1) +
   scale_colour_brewer(
     name = "Bet Amount",
     # need to order bets appropriately
@@ -174,7 +175,7 @@ graph_varya <- create_universal_set(
   # lines for each bet amount
   geom_line(aes(color = bet_amount_color, linetype = is_kelly), size = 1) +
   # shaded area for best bet
-  geom_ribbon(aes(ymin = 0, ymax = .15, fill = best_bet), alpha = .1) +
+  geom_ribbon(aes(ymin = 0, ymax = .15, fill = best_bet_color), alpha = .1) +
   scale_colour_brewer(
     name = "Bet Amount",
     # need to order bets appropriately
@@ -202,6 +203,56 @@ graph_varya <- create_universal_set(
 ggsave(
   file = 'varya.png', 
   plot = graph_varya, 
+  width = 6, 
+  height = 4, 
+  path = 'intersection_plots'
+)
+
+graph_varya_casino <- create_universal_set(
+  bankroll = 100000, 
+  bet_amount = c(1000, 2000, 5000, 10000, 25000, 50000), 
+  probability = 2/3, 
+  odds = seq(.5, 1.5, length.out = 1001)
+) %>%
+  filter(bet_amount_color == 'Theoretical Kelly') %>%
+  mutate(
+    discrete_profit = best_bet * (1 - odds),
+    theoretical_profit = bet_amount * (1 - odds)
+    ) %>%
+  select(odds, best_bet_color, discrete_profit, theoretical_profit) %>%
+  pivot_longer(
+    cols = ends_with('profit'),
+    names_to = 'scenario_type',
+    values_to = 'casino_profit'
+  ) %>%
+  mutate(
+    scenario_type = if_else(
+      scenario_type == 'discrete_profit', 
+      'Discrete', 
+      'Continuous'
+      )
+    ) %>%
+  ggplot(aes(x = odds, y = casino_profit, linetype = scenario_type)) +
+  # lines for discrete and continuous profit
+  geom_line() +
+  # shaded area for best bet
+  geom_ribbon(aes(ymin = -25000, ymax = 10000, fill = best_bet_color), alpha = .1) +
+  theme_bw() +
+  scale_fill_brewer(
+    type = 'qual',
+    palette = 'Set2',
+    name = 'Kelly Discrete Bet'
+    ) +
+  scale_linetype_manual(
+    values = c("dotted", "solid"),
+    name = 'Scenario'
+    ) +
+  xlab("Odds") + 
+  ylab("Casino Profit per Kelly Bettor")
+
+ggsave(
+  file = 'varya_casino.png', 
+  plot = graph_varya_casino, 
   width = 6, 
   height = 4, 
   path = 'intersection_plots'
@@ -242,7 +293,7 @@ graph_varyb <- create_universal_set(
   # lines for each bet amount
   geom_line(aes(color = bet_amount_color, linetype = is_kelly), size = 1) +
   # shaded area for best bet
-  geom_ribbon(aes(ymin = 0, ymax = 0.04045989, fill = best_bet), alpha = .1) +
+  geom_ribbon(aes(ymin = 0, ymax = 0.04045989, fill = best_bet_color), alpha = .1) +
   scale_colour_brewer(
     name = "Bet Amount",
     # need to order bets appropriately
