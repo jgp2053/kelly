@@ -325,3 +325,36 @@ ggsave(
   height = 4, 
   path = 'intersection_plots'
 )
+
+# save figures for jqas submission
+ggsave(
+  file = 'fig_1.jpg', 
+  plot = graph_varyp, 
+  width = 6, 
+  height = 4, 
+  path = 'jqas_submission/figures'
+)
+
+ggsave(
+  file = 'fig_2.jpg', 
+  plot = graph_varya, 
+  width = 6, 
+  height = 4, 
+  path = 'jqas_submission/figures'
+)
+
+ggsave(
+  file = 'fig_3.jpg', 
+  plot = graph_varyb, 
+  width = 6, 
+  height = 4, 
+  path = 'jqas_submission/figures'
+)
+
+ggsave(
+  file = 'fig_8.jpg', 
+  plot = graph_varya_casino, 
+  width = 6, 
+  height = 4, 
+  path = 'jqas_submission/figures'
+)

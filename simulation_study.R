@@ -468,7 +468,7 @@ ggsave(
 #     discrete_kelly_beats_theoretical_kelly
 #   )
 
-gone_broke <- multiple_run %>%
+gone_bankrupt <- multiple_run %>%
   select(-c(diff_bet, bet_result)) %>%
   filter(time >= (max(time) - 1)) %>% # last and next to last betting cycle
   pivot_longer(
@@ -478,7 +478,7 @@ gone_broke <- multiple_run %>%
   ) %>%
   group_by(strategy, sim_no) %>%
   summarise(
-    run_gone_broke = 
+    run_gone_bankrupt = 
       min(strategy_bankroll) == 0 || # bankroll hit zero
       length(unique(strategy_bankroll)) == 1
       ) %>%
@@ -487,36 +487,36 @@ gone_broke <- multiple_run %>%
     strategy = clean_strategy_name(strategy)
   )
 
-graph_gone_broke <- gone_broke %>%
+graph_gone_bankrupt <- gone_bankrupt %>%
   group_by(strategy) %>%
-  summarise(times_gone_broke = sum(run_gone_broke) / n()) %>%
+  summarise(times_gone_bankrupt = sum(run_gone_bankrupt) / n()) %>%
   ggplot(
     aes(
-      x = reorder(strategy, -times_gone_broke),
-      y = times_gone_broke,
+      x = reorder(strategy, -times_gone_bankrupt),
+      y = times_gone_bankrupt,
       fill = strategy
       )
     ) +
   kelly_plot_style('bar') +
   geom_bar(stat = "identity") +
   scale_y_continuous(labels = scales::percent) +
-  ylab("% of Runs Gone Broke") +
+  ylab("% of Runs Gone bankrupt") +
   xlab("Betting Strategy")
 
 ggsave(
-  file = 'gone_broke.png', 
-  plot = graph_gone_broke, 
+  file = 'gone_bankrupt.png', 
+  plot = graph_gone_bankrupt, 
   width = 6, 
   height = 4, 
   path = 'simulation_plots'
 )
 
-gone_broke_summarised <- gone_broke %>%
+gone_bankrupt_summarised <- gone_bankrupt %>%
   group_by(strategy) %>%
-  summarise(freq_gone_broke = sum(run_gone_broke) / n()) 
+  summarise(freq_gone_bankrupt = sum(run_gone_bankrupt) / n()) 
 
-gone_broke_summarised %>%
-  write_csv(path = 'data/gone_broke.csv')
+gone_bankrupt_summarised %>%
+  write_csv(path = 'data/gone_bankrupt.csv')
 
 # geometric means
 gm_mean = function(x, na.rm=TRUE){
@@ -535,13 +535,13 @@ gm_means <- multiple_run %>%
     strategy = clean_strategy_name(strategy)
   )
 
-graph_gm_mean_and_gone_broke <- gone_broke_summarised %>%
-  mutate(freq_not_gone_broke = 1 - freq_gone_broke) %>%
+graph_gm_mean_and_gone_bankrupt <- gone_bankrupt_summarised %>%
+  mutate(freq_not_gone_bankrupt = 1 - freq_gone_bankrupt) %>%
   left_join(gm_means %>% filter(time == max(time))) %>%
   # filter(strategy != 'Theoretical Kelly') %>% 
   ggplot(
     mapping = aes(
-      x = freq_not_gone_broke, 
+      x = freq_not_gone_bankrupt, 
       y = geometric_mean_bankroll,
       color = strategy,
       label = strategy
@@ -555,12 +555,12 @@ graph_gm_mean_and_gone_broke <- gone_broke_summarised %>%
   ) +
   scale_x_continuous(labels = scales::percent) +
   scale_y_continuous(trans='log10') +
-  xlab("% of Runs Not Gone Broke") +
+  xlab("% of Runs Not Gone bankrupt") +
   ylab("Geometric Mean of Final Bankroll")
 
 ggsave(
-  file = 'gm_mean_and_gone_broke.png', 
-  plot = graph_gm_mean_and_gone_broke, 
+  file = 'gm_mean_and_gone_bankrupt.png', 
+  plot = graph_gm_mean_and_gone_bankrupt, 
   width = 6, 
   height = 4, 
   path = 'simulation_plots'
@@ -594,14 +594,35 @@ ggsave(
   path = 'simulation_plots'
 )
 
-# gm_means <- multiple_run %>%
-#   group_by(time) %>%
-#   summarise(discrete_kelly_bankroll = gm_mean(discrete_kelly_bankroll),
-#             random_bookend_bankroll = gm_mean(random_bookend_bankroll),
-#             closest_bookend_bankroll = gm_mean(closest_bookend_bankroll),
-#             kelly_bankroll = gm_mean(kelly_bankroll)) %>%
-#   gather(key = 'strategy', value = 'geometric mean bankroll', -time) %>%
-#   # clean up column value for graph
-#   mutate(
-#     strategy = clean_strategy_name(strategy)
-#   )
+# save figures for jqas submission
+ggsave(
+  file = 'fig_4.jpg', 
+  plot = graph_beat_or_tie, 
+  width = 6, 
+  height = 4, 
+  path = 'jqas_submission/figures'
+)
+
+ggsave(
+  file = 'fig_5.jpg', 
+  plot = graph_medians, 
+  width = 6, 
+  height = 4, 
+  path = 'jqas_submission/figures'
+)
+
+ggsave(
+  file = 'fig_6.jpg', 
+  plot = graph_means, 
+  width = 6, 
+  height = 4, 
+  path = 'jqas_submission/figures'
+)
+
+ggsave(
+  file = 'fig_7.jpg', 
+  plot = graph_gm_mean_and_gone_bankrupt, 
+  width = 6, 
+  height = 4, 
+  path = 'jqas_submission/figures'
+)
